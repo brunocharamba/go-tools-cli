@@ -44,7 +44,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	RootCmd.AddCommand(image.ResizeCmd, password.PasswordCmd)
+	RootCmd.AddCommand(image.ImageCmd, password.PasswordCmd)
 	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
