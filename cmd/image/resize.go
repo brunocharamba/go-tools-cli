@@ -56,7 +56,7 @@ func executeResize(cmd *cobra.Command, args []string) {
 	count := len(args)
 	for i, arg := range args {
 		outputName := parseImage(width, height, percentage, extension, arg)
-		log.Printf("[ %v/%v ] Image '%v' successfully! \n", i + 1, count, outputName)
+		log.Printf("[%v/%v] Image '%v' successfully! \n", i + 1, count, outputName)
 	}
 }
 
