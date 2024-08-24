@@ -18,14 +18,6 @@ import (
 
 var VALID_EXTS = []string{".jpg", ".png"}
 
-var ImageCmd = &cobra.Command{
-	Use: "image",
-	Short: "Handles image",
-	Long: `Handles image. For example:
-
-	got image`,
-}
-
 var resizeCmd = &cobra.Command{
 	Use: "resize",
 	Short: "Resize images inside a folder",
@@ -39,7 +31,6 @@ func init() {
 	resizeCmd.Flags().IntP("height", "y", 0, "Height of the output image")
 	resizeCmd.Flags().Float32P("percentage", "p", 0, "Percentage of the output image")
 	resizeCmd.Flags().StringP("extension", "e", "jpg", "Extension of the output. Default: jpg. Options: jpg, png.")
-	ImageCmd.AddCommand(resizeCmd)
 }
 
 func executeResize(cmd *cobra.Command, args []string) {
