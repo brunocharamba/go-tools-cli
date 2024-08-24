@@ -12,4 +12,5 @@ var ImageCmd = &cobra.Command{
 
 func init() {
 	ImageCmd.AddCommand(resizeCmd)
+	ImageCmd.AddCommand(filterCmd)
 }
