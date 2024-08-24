@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"image/png"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/image/draw"
 )
+
+var VALID_EXTS = []string{".jpg", ".png"}
 
 var ImageCmd = &cobra.Command{
 	Use: "image",
@@ -34,6 +38,7 @@ func init() {
 	resizeCmd.Flags().IntP("width", "x", 0, "Width of the output image")
 	resizeCmd.Flags().IntP("height", "y", 0, "Height of the output image")
 	resizeCmd.Flags().Float32P("percentage", "p", 0, "Percentage of the output image")
+	resizeCmd.Flags().StringP("extension", "e", "jpg", "Extension of the output. Default: jpg. Options: jpg, png.")
 	ImageCmd.AddCommand(resizeCmd)
 }
 
@@ -41,10 +46,13 @@ func executeResize(cmd *cobra.Command, args []string) {
 	width, _ := cmd.Flags().GetInt("width")
 	height, _ := cmd.Flags().GetInt("height")
 	percentage, _ := cmd.Flags().GetFloat32("percentage")
+	extension, _ := cmd.Flags().GetString("extension")
 
 	if len(args) == 0 {
 		panic("No images found.")
 	}
+
+	extension = handleExtension(extension)
 
 	path := "output"
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
@@ -54,12 +62,28 @@ func executeResize(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	for _, arg := range args {
-		parseImage(width, height, percentage, arg)
+	count := len(args)
+	for i, arg := range args {
+		outputName := parseImage(width, height, percentage, extension, arg)
+		log.Printf("[ %v/%v ] Image '%v' successfully! \n", i + 1, count, outputName)
 	}
 }
 
-func parseImage(width int, height int, percentage float32, arg string) {
+func handleExtension(extension string) string{
+	// add '.' if it was not added
+	if extension[0] != '.' {
+		extension = "." + extension
+	}
+
+	// check output extension
+	if !slices.Contains(VALID_EXTS, extension) {
+		log.Printf("Extension '%v' isn't valid %v. Defaulting to the same extension \n", extension, VALID_EXTS)
+	}
+
+	return extension
+}
+
+func parseImage(width int, height int, percentage float32, extension string, arg string) string {
 // Open the input image file
 	file, err := os.Open(arg)
 	if err != nil {
@@ -75,7 +99,6 @@ func parseImage(width int, height int, percentage float32, arg string) {
 
 	var destination image.RGBA
 
-
 	if percentage > 0 {
 		// parse as percentage
 		newWidth := int(float32(img.Bounds().Dx()) * percentage)
@@ -86,29 +109,24 @@ func parseImage(width int, height int, percentage float32, arg string) {
 		newWidth, newHeight := getNewBounds(width, height, &img)
 		destination = *image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
 	} else {
-		// run default
 		panic("Pass or a percentage or values for width and/or height")
 	}
 
-	// Perform the scaling using BiLinear interpolation
+	// perform the scaling using BiLinear interpolation
 	draw.BiLinear.Scale(&destination, destination.Bounds(), img, img.Bounds(), draw.Over, nil)
 
-	outputName := fmt.Sprintf("%v-resized.jpg", strings.TrimSuffix(arg, filepath.Ext(arg)))
+	// generate file
+	outputFile, outputName := generateFile(arg, extension)
 
-	// Create a new file to save the resized image
-	out, err := os.Create(fmt.Sprintf("output/%v", outputName))
-	if err != nil {
-		log.Fatalf("Failed to create output image file: %v", err)
-	}
-	defer out.Close()
-
-	// Encode the resized image to the file in JPEG format
-	err = jpeg.Encode(out, &destination, nil)
-	if err != nil {
-		log.Fatalf("Failed to encode image: %v", err)
+	// encode the resized image to the file
+	switch extension {
+		case ".jpg":
+			encodeJpgImage(outputFile, &destination)
+		case ".png":
+			encodePngImage(outputFile, &destination)
 	}
 
-	log.Printf("Image '%v' successfully! \n", outputName)
+	return outputName
 }
 
 func getNewBounds(width int, height int, img *image.Image) (int, int) {
@@ -124,4 +142,34 @@ func getNewBounds(width int, height int, img *image.Image) (int, int) {
 
 	ratio := float64(height) / float64(originalHeight)
 	return int(float64(originalWidth) * ratio), height
+}
+
+func generateFile(originalFileName string, ext string) (*os.File, string) {
+	originalExt := filepath.Ext(originalFileName)
+	outputName := fmt.Sprintf("%v-resized%v", strings.TrimSuffix(originalFileName, originalExt), ext)
+
+	// Create a new file to save the resized image
+	out, err := os.Create(fmt.Sprintf("output/%v", outputName))
+	if err != nil {
+		log.Fatalf("Failed to create output image file: %v", err)
+	}
+
+	return out, outputName
+}
+
+func encodeJpgImage(outputFile *os.File, outputImage image.Image) {
+	err := jpeg.Encode(outputFile, outputImage, nil)
+	defer outputFile.Close()
+
+	if err != nil {
+		log.Fatalf("Failed to encode image: %v", err)
+	}
+}
+
+func encodePngImage(outputFile *os.File, outputImage image.Image) {
+	err := png.Encode(outputFile, outputImage)
+
+	if err != nil {
+		log.Fatalf("Failed to encode image: %v", err)
+	}
 }
